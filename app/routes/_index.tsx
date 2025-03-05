@@ -1,5 +1,14 @@
 import type { MetaFunction } from "@remix-run/node";
-import { Form } from "@remix-run/react";
+import { Form, useActionData, useNavigate } from "@remix-run/react";
+import { addUser, User } from "users";
+import { v4 as uuidv4 } from "uuid";
+import { findUserByEmailPassword } from "users";
+import { useEffect } from "react";
+
+type ActionData = {
+  error?: string;
+  user?: User;
+};
 
 export const meta: MetaFunction = () => {
   return [
@@ -8,7 +17,52 @@ export const meta: MetaFunction = () => {
   ];
 };
 
+export const action = async ({ request }: { request: Request }) => {
+  const formData = await request.formData();
+  const name = formData.get("name");
+  const email = formData.get("email");
+  const password = formData.get("password");
+  if (!email || !password) {
+    return new Response("Invalid email or password", {
+      status: 400,
+    });
+  }
+  const newUser = {
+    id: uuidv4(),
+    name: name as string,
+    email: email as string,
+    password: password as string,
+  };
+
+  const existingUser = findUserByEmailPassword(
+    email as string,
+    password as string
+  );
+  const user = existingUser || newUser;
+
+  if (!existingUser) {
+    addUser(newUser);
+  }
+
+  return Response.json({ user }, { status: existingUser ? 200 : 201 });
+};
+
 export default function Index() {
+  const navigate = useNavigate();
+  const actionData = useActionData<ActionData>();
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("userId");
+    if (storedUser) {
+      navigate(`/profile/${storedUser}`);
+    }
+
+    if (actionData?.user) {
+      localStorage.setItem("userId", actionData.user.id);
+      navigate(`/profile/${actionData.user.id}`);
+    }
+  }, [actionData?.user, navigate]);
+
   return (
     <div className="h-screen bg-gray-100 flex items-center justify-center">
       <div className="max-w-md w-full bg-white p-8 shadow rounded">
