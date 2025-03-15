@@ -1,22 +1,37 @@
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
-import { User, findUser } from "users";
+import { useLoaderData, useNavigate } from "@remix-run/react";
+import { User, findUser, deleteUser } from "users";
 import { Form } from "@remix-run/react";
 
 export const loader = async ({ params }: { params: { id: string } }) => {
   const user = await findUser(params.id);
   if (!user) {
-    throw redirect;
+    throw redirect("/");
   }
   return json(user);
 };
 
+export const action = async ({ request }: { request: Request }) => {
+  const formData = await request.formData();
+  const actionType = formData.get("actionType");
+  const userId = formData.get("userId");
+
+  if (actionType === "delete" && userId) {
+    deleteUser(userId as string);
+    return redirect("/");
+  }
+
+  return null;
+};
+
 export default function Profile() {
   const user = useLoaderData<User>();
+  const navigate = useNavigate();
 
   const handleClientSideLogout = (action: string) => {
     if (action === "logout") {
       localStorage.removeItem("userId");
+      navigate("/");
     }
   };
 
@@ -29,15 +44,28 @@ export default function Profile() {
         </p>
         <p>
           <strong>Email:</strong> {user.email}
-          <Form method="post" onSubmit={() => handleClientSideLogout("logout")}>
-            <input type="hidden" name="action" value="logout" />
-            <button type="submit">Logout</button>
-          </Form>
-          <Form method="post" onSubmit={() => handleClientSideLogout("delete")}>
-            <input type="hidden" name="delete" value="delete" />
-            <button type="submit">Logout</button>
-          </Form>
         </p>
+        <div className="mt-4 space-y-4">
+          <Form method="post" onSubmit={() => handleClientSideLogout("logout")}>
+            <input type="hidden" name="actionType" value="logout" />
+            <button
+              type="submit"
+              className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600"
+            >
+              Logout
+            </button>
+          </Form>
+          <Form method="post">
+            <input type="hidden" name="actionType" value="delete" />
+            <input type="hidden" name="userId" value={user.id} />
+            <button
+              type="submit"
+              className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
+            >
+              Delete Account
+            </button>
+          </Form>
+        </div>
       </div>
     </div>
   );
